@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-func ReadConsulConfig[C struct{}](prefix, token, address string) C {
+func ReadConsulConfig[C any](conf *C, prefix, token, address string) C {
 
 	cconfig := &api.Config{Token: token, Address: address,
 		Scheme: "https"}
@@ -27,10 +27,9 @@ func ReadConsulConfig[C struct{}](prefix, token, address string) C {
 	for _, p := range kvpairs {
 		configMap[strings.TrimPrefix(p.Key, prefix)] = string(p.Value)
 	}
-	conf := &C{}
+
 	PopulateConfig(configMap, reflect.ValueOf(conf))
 	return *conf
-
 }
 
 func unwrap(v interface{}) reflect.Value {
