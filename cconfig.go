@@ -93,6 +93,12 @@ func PopulateConfig(configMap map[string]string, ptr interface{}) reflect.Value 
 			} else {
 				field.Set(reflect.ValueOf(defaultVal))
 			}
+		case reflect.Int:
+			if v, ok := configMap[tag]; ok {
+				if intVal, perr := strconv.Atoi(v); perr == nil {
+					field.Set(reflect.ValueOf(intVal))
+				}
+			}
 		case reflect.Bool:
 			if v, ok := configMap[tag]; ok {
 				if boolVal, _ := strconv.ParseBool(v); boolVal {
