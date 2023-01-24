@@ -90,13 +90,25 @@ func PopulateConfig(configMap map[string]string, ptr interface{}) reflect.Value 
 		case reflect.String:
 			if v, ok := configMap[tag]; ok {
 				field.Set(reflect.ValueOf(v))
-			} else {
+			} else if defaultVal != "" {
 				field.Set(reflect.ValueOf(defaultVal))
 			}
 		case reflect.Int:
 			if v, ok := configMap[tag]; ok {
 				if intVal, perr := strconv.Atoi(v); perr == nil {
 					field.Set(reflect.ValueOf(intVal))
+				}
+			}
+		case reflect.Int64:
+			if v, ok := configMap[tag]; ok {
+				if int64Val, perr := strconv.ParseInt(v, 10, 64); perr == nil {
+					field.Set(reflect.ValueOf(int64Val))
+				}
+			}
+		case reflect.Float64:
+			if v, ok := configMap[tag]; ok {
+				if f64Val, perr := strconv.ParseFloat(v, 64); perr == nil {
+					field.Set(reflect.ValueOf(f64Val))
 				}
 			}
 		case reflect.Bool:
