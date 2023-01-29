@@ -10,9 +10,10 @@ type Foo struct {
 	Headers map[string]string `config:"foo/headers" json:"headers"`
 }
 type Config struct {
-	Foo     Foo    `config:"foo" json:"foo"`
-	LogFile string `config:"logfile,/var/app/log/logfile.log" json:"logFile"`
-	Refresh bool   `config:"refresh" json:"refresh"`
+	Foo     Foo      `config:"foo" json:"foo"`
+	LogFile string   `config:"logfile,/var/app/log/logfile.log" json:"logFile"`
+	Refresh bool     `config:"refresh" json:"refresh"`
+	Items   []string `config:"items" json:"items"`
 }
 
 func TestPopulateConfig(t *testing.T) {
@@ -21,11 +22,12 @@ func TestPopulateConfig(t *testing.T) {
 		"foo/headers": "{\"foo\": \"bar\", \"baz\": \"quux\"}",
 		"log-file":    "/var/app/log/logfile.log",
 		"refresh":     "true",
+		"items":       "[\"a\",\"b\"]",
 	}
 	conf := &Config{}
 	PopulateConfig(m, conf)
 	fmt.Printf("%+v\n", *conf)
-	
+
 	if !conf.Refresh {
 		t.Errorf("refresh is %v\n", conf.Refresh)
 	}
@@ -37,5 +39,8 @@ func TestPopulateConfig(t *testing.T) {
 	}
 	if v, exists := conf.Foo.Headers["baz"]; !exists || v != "quux" {
 		t.Errorf("baz key is wrong %v\n", v)
+	}
+	if len(conf.Items) != 2 || conf.Items[0] != "a" || conf.Items[1] != "b" {
+		t.Errorf("did not parse items correctly: %v", conf.Items)
 	}
 }

@@ -4,24 +4,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/hashicorp/consul/api"
-	"log"
 	"reflect"
 	"strconv"
 	"strings"
 )
 
-func ReadConsulConfig[C any](conf *C, prefix, token, address string) C {
+func ReadConsulConfig[C any](conf *C, prefix, token, address string) error {
 
-	cconfig := &api.Config{Token: token, Address: address,
-		Scheme: "https"}
+	cconfig := &api.Config{Token: token, Address: address, Scheme: "https"}
 	c, err := api.NewClient(cconfig)
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 	kv := c.KV()
 	kvpairs, _, err := kv.List(prefix, &api.QueryOptions{})
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 	configMap := make(map[string]string)
 	for _, p := range kvpairs {
@@ -29,7 +27,7 @@ func ReadConsulConfig[C any](conf *C, prefix, token, address string) C {
 	}
 
 	PopulateConfig(configMap, reflect.ValueOf(conf))
-	return *conf
+	return nil
 }
 
 func unwrap(v interface{}) reflect.Value {
@@ -55,10 +53,10 @@ func derefValue(v interface{}) (reflect.Value, error) {
 	return val, nil
 }
 
-func PopulateConfig(configMap map[string]string, ptr interface{}) reflect.Value {
-	v, err := derefValue(ptr)
-	if err != nil {
-		log.Fatalln(err)
+func PopulateConfig(configMap map[string]string, ptr interface{}) (reflect.Value, error) {
+	v, derr := derefValue(ptr)
+	if derr != nil {
+		return reflect.Value{}, derr
 	}
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
@@ -86,7 +84,11 @@ func PopulateConfig(configMap map[string]string, ptr interface{}) reflect.Value 
 				}
 			}
 		case reflect.Struct:
-			field.Set(PopulateConfig(configMap, field.Addr()))
+			if v, err := PopulateConfig(configMap, field.Addr()); err != nil {
+				return reflect.Value{}, err
+			} else {
+				field.Set(v)
+			}
 		case reflect.String:
 			if v, ok := configMap[tag]; ok {
 				field.Set(reflect.ValueOf(v))
@@ -131,5 +133,5 @@ func PopulateConfig(configMap map[string]string, ptr interface{}) reflect.Value 
 			}
 		}
 	}
-	return v
+	return v, nil
 }
