@@ -21,12 +21,13 @@ func ReadConsulConfig[C any](conf *C, prefix, token, address string) error {
 	if err != nil {
 		return err
 	}
-	configMap := make(map[string]string)
+
+	cTree := newConfigTree()
 	for _, p := range kvpairs {
-		configMap[strings.TrimPrefix(p.Key, prefix)] = string(p.Value)
+		cTree.addNode(strings.TrimPrefix(p.Key, prefix), string(p.Value))
 	}
 
-	PopulateConfig(configMap, reflect.ValueOf(conf))
+	populateConfig(cTree, reflect.ValueOf(conf))
 	return nil
 }
 
@@ -53,7 +54,14 @@ func derefValue(v interface{}) (reflect.Value, error) {
 	return val, nil
 }
 
-func PopulateConfig(configMap map[string]string, ptr interface{}) (reflect.Value, error) {
+func PopulateConfig(configMap map[string]string, ptr interface{}) error {
+	if _, err := populateConfig(newConfigTreeFromMap(configMap), ptr); err != nil {
+		return err
+	}
+	return nil
+}
+
+func populateConfig(confTree *configTree, ptr interface{}) (reflect.Value, error) {
 	v, derr := derefValue(ptr)
 	if derr != nil {
 		return reflect.Value{}, derr
@@ -68,7 +76,7 @@ func PopulateConfig(configMap map[string]string, ptr interface{}) (reflect.Value
 		}
 		switch field.Kind() {
 		case reflect.Map:
-			if jsonValue, ok := configMap[tag]; ok {
+			if jsonValue, ok := confTree.getString(tag); ok {
 				stringMap := make(map[string]string)
 				var m map[string]interface{}
 				if err := json.Unmarshal([]byte(jsonValue), &m); err == nil {
@@ -84,37 +92,39 @@ func PopulateConfig(configMap map[string]string, ptr interface{}) (reflect.Value
 				}
 			}
 		case reflect.Struct:
-			if v, err := PopulateConfig(configMap, field.Addr()); err != nil {
-				return reflect.Value{}, err
-			} else {
-				field.Set(v)
+			if st, exists := confTree.getSubTree(tag); exists {
+				if v, err := populateConfig(st, field.Addr()); err != nil {
+					return reflect.Value{}, err
+				} else {
+					field.Set(v)
+				}
 			}
 		case reflect.String:
-			if v, ok := configMap[tag]; ok {
+			if v, ok := confTree.getString(tag); ok {
 				field.Set(reflect.ValueOf(v))
 			} else if defaultVal != "" {
 				field.Set(reflect.ValueOf(defaultVal))
 			}
 		case reflect.Int:
-			if v, ok := configMap[tag]; ok {
+			if v, ok := confTree.getString(tag); ok {
 				if intVal, perr := strconv.Atoi(v); perr == nil {
 					field.Set(reflect.ValueOf(intVal))
 				}
 			}
 		case reflect.Int64:
-			if v, ok := configMap[tag]; ok {
+			if v, ok := confTree.getString(tag); ok {
 				if int64Val, perr := strconv.ParseInt(v, 10, 64); perr == nil {
 					field.Set(reflect.ValueOf(int64Val))
 				}
 			}
 		case reflect.Float64:
-			if v, ok := configMap[tag]; ok {
+			if v, ok := confTree.getString(tag); ok {
 				if f64Val, perr := strconv.ParseFloat(v, 64); perr == nil {
 					field.Set(reflect.ValueOf(f64Val))
 				}
 			}
 		case reflect.Bool:
-			if v, ok := configMap[tag]; ok {
+			if v, ok := confTree.getString(tag); ok {
 				if boolVal, _ := strconv.ParseBool(v); boolVal {
 					field.Set(reflect.ValueOf(boolVal))
 				} else {
@@ -124,7 +134,7 @@ func PopulateConfig(configMap map[string]string, ptr interface{}) (reflect.Value
 		case reflect.Slice:
 			switch field.Type().Elem().Kind() {
 			case reflect.String:
-				if v, ok := configMap[tag]; ok {
+				if v, ok := confTree.getString(tag); ok {
 					var vHolder []string
 					if err := json.Unmarshal([]byte(v), &vHolder); err == nil {
 						field.Set(reflect.ValueOf(vHolder))
