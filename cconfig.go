@@ -11,7 +11,7 @@ import (
 
 func ReadConsulConfig[C any](conf *C, prefix, token, address string) error {
 
-	cconfig := &api.Config{Token: token, Address: address, Scheme: "https"}
+	cconfig := &api.Config{Token: token, Address: address}
 	c, err := api.NewClient(cconfig)
 	if err != nil {
 		return err
